@@ -52,13 +52,6 @@ class MajorDataIter(mx.io.DataIter):
             return mx.io.DataBatch(data=self.data, label=self.label)
         else:
             raise StopIteration
-    #"""
-    def unpickle_(self, file):
-        fo = open(file, 'rb')
-        data = cPickle.load(fo)
-        fo.close()
-        return data 
-    #"""
     def unpickle(self, file):   
 	id = file.split('/')[-1]
 	return self.all_data[id]
