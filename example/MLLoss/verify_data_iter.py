@@ -57,7 +57,7 @@ class MajorDataIter(mx.io.DataIter):
         
         for i in data_genuine_index:
             file = self.data_dir + "/" + i
-            x = np.load(file)
+            x = np.load(file)['arr_0']
             data_genuine.append(x)
             label_genuine.append(int(i)*np.ones(x.shape[0]))
             label_genuine_set += [int(i)]
@@ -69,7 +69,7 @@ class MajorDataIter(mx.io.DataIter):
         label_imposter = []
         for i in data_imposter_index:
             file = self.data_dir + "/" + i
-            x = np.load(file)
+            x = np.load(file)['arr_0']
             data_imposter.append(x)
             label_imposter.append(int(i)*np.ones(x.shape[0]))
                 
