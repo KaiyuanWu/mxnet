@@ -19,8 +19,7 @@ class MajorDataIter(mx.io.DataIter):
         self.cur = 0
         self.shuffle = shuffle
         if shuffle:
-            random.shuffle(self.samples)
-	self.get_batch()   
+            random.shuffle(self.samples)  
 	 
        
     def provide_data(self):
@@ -60,20 +59,21 @@ class MajorDataIter(mx.io.DataIter):
             x = np.load(file)['arr_0']
             data_genuine.append(x)
             label_genuine.append(int(i)*np.ones(x.shape[0]))
-            label_genuine_set += [int(i)]
-            
+            label_genuine_set += [int(i)]            
             
         data_imposter_index = [self.samples[i%num_classes] for i in range( cur + num_genuine,  cur + num_classes)]
-        data_imposter_index = [data_imposter_index[i] for i in np.random.randint(0, len(data_imposter_index), num_imposter)]
+        data_imposter_index = [data_imposter_index[i%len(data_imposter_index)] for i in range(num_imposter)]
         data_imposter = []
         label_imposter = []
+	label_imposter_set = []
         for i in data_imposter_index:
             file = self.data_dir + "/" + i
             x = np.load(file)['arr_0']
             data_imposter.append(x)
-            label_imposter.append(int(i)*np.ones(x.shape[0]))
-                
+            label_imposter.append(int(i)*np.ones(x.shape[0]))     
+	    label_imposter_set += [int(i)]
+            label_genuine_set += [int(i)]            
         
-        self.data = {'data_genuine': np.concatenate(data_genuine), 'data_imposter': np.concatenate(data_imposter)}
-        self.label = {'label_genuine': np.concatenate(label_genuine), 'label_imposter': np.concatenate(label_imposter), 'label_genuine_set': np.array(label_genuine_set)}
+        self.data = {'data':np.concatenate(data_genuine + data_imposter)}
+        self.label = {'label': np.concatenate(label_genuine+label_imposter), 'label_genuine_set': np.array(label_genuine_set), 'label_imposter_set': np.array(label_imposter_set)}
 
