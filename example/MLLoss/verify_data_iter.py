@@ -1,79 +1,56 @@
 # -*- coding: utf-8 -*-
-import mxnet as mx
-import random
-import os
+# 将图片数据存储到leveldb中
+import cv2
 import numpy as np
+import leveldb
+import logging
+import struct
+import sys
+FORMAT = '%(asctime)-15s  %(message)s'
+logging.basicConfig(format=FORMAT)
 
-class MajorDataIter(mx.io.DataIter):
-    def __init__(self, data_dir, num_genuine = 1, num_imposter = 3, img_size=(3, 32, 32), shuffle=False):
-        super(MajorDataIter, self).__init__()
-        self.data_dir = data_dir
-        self.num_genuine = num_genuine
-        self.num_imposter = num_imposter
-        self.img_size = img_size
-        
-        self.samples = os.listdir(data_dir)
-        self.num_classes = len(self.samples)
-        self.data = None
-        self.label = None
-        self.cur = 0
-        self.shuffle = shuffle
-        if shuffle:
-            random.shuffle(self.samples)  
-	 
-       
-    def provide_data(self):
-        return [(k, v.shape) for k, v in self.data.items()]   
-    
-    def provide_label(self):
-        return [(k, v.shape) for k, v in self.label.items()]
-    
-    def reset(self):
-        self.cur = 0
-        if self.shuffle:
-            random.shuffle(self.samples)
-            
-    def iter_next(self):
-        return self.cur < self.num_classes
-        
-    def next(self):
-        if self.iter_next():
-            self.get_batch()
-            self.cur += self.num_genuine
-            return mx.io.DataBatch(data=self.data, label=self.label)
-        else:
-            raise StopIteration
- 
-    def get_batch(self):
-        cur = self.cur
-        num_classes = self.num_classes
-        num_genuine = self.num_genuine
-        num_imposter = self.num_imposter
-        data_genuine_index = [self.samples[i%num_classes] for i in range(cur, cur + num_genuine)]
-        data_genuine = []
-        label_genuine = []
-        label_genuine_set =[]
-        
-        for i in data_genuine_index:
-            file = self.data_dir + "/" + i
-            x = np.load(file)['arr_0']
-            data_genuine.append(x)
-            label_genuine.append(int(i)*np.ones(x.shape[0]))
-            label_genuine_set += [int(i)]            
-            
-        data_imposter_index = [self.samples[i%num_classes] for i in range( cur + num_genuine,  cur + num_classes)]
-        data_imposter_index = [data_imposter_index[i%len(data_imposter_index)] for i in range(num_imposter)]
-        data_imposter = []
-        label_imposter = []
-	label_imposter_set = []
-        for i in data_imposter_index:
-            file = self.data_dir + "/" + i
-            x = np.load(file)['arr_0']
-            data_imposter.append(x)
-            label_imposter.append(int(i)*np.ones(x.shape[0]))     
-	    label_imposter_set += [int(i)]
-            label_genuine_set += [int(i)]            
-        
-        self.data = {'data':np.concatenate(data_genuine + data_imposter)}
-        self.label = {'label': np.concatenate(label_genuine+label_imposter), 'label_genuine_set': np.array(label_genuine_set), 'label_imposter_set': np.array(label_imposter_set)}
+__author__ = "kaiwu"
+__date__ = "$Oct 13, 2016 11:24:32 AM$"
 
+#filename是一个列表文件，里面包含需要存储的图片列表     
+#idx id image_filename additional_label
+#example: 
+def cvt_data_to_leveldb(filename,  leveldb_dir, addtional_label_length=0):
+    db = leveldb.LevelDB(leveldb_dir,write_buffer_size = 536870912)
+    index = 0
+    for line in open(filename):
+        fields = line.split()
+        id = int(fields[0])
+        image_filename = fields[1]
+        if addtional_label_length > 0:
+            addtional_label = np.array([float(i) for i in fields[2:]], dtype = 'float32')
+        try:
+            img = cv2.imread(image_filename, -1)
+	    if len(img.shape)==2:
+		c = 1
+		h,w = img.shape
+	    else:
+		h,w,c = img.shape
+            img_str = img.tostring()
+            if addtional_label_length > 0:
+                addtional_label_str = addtional_label.tostring()
+                fmt="i%dsiii%dsi%ds"%(len(img_str),len(addtional_label_str),len(image_filename))
+                value = struct.pack(fmt, id, img_str,h,w,c, addtional_label_str,addtional_label_length, image_filename)
+            else:
+                fmt="i%dsiii%ds"%(len(img_str),len(image_filename))
+                value = struct.pack(fmt, id, img_str,h,w,c,  image_filename)
+            key = "%012d_%010d_%s"%(index, id, fmt)
+            db.Put(key, value)
+        except Exception as e:
+            logging.error("Error while save %s, error: %s"%(image_filename, e.message))
+        if index%10000 == 0:
+            logging.warning("processed %d items"%index)
+        index += 1    
+    logging.warning("finish process all items")
+
+#example: python cvt_data_to_leveldb.py /tmp/mnist/train_list.txt /tmp/mnist/train_leveldb 0 
+#       
+filename = sys.argv[1]
+leveldb_dir = sys.argv[2]
+addtional_label_length = int(sys.argv[3])
+cvt_data_to_leveldb(filename,  leveldb_dir, addtional_label_length)    
