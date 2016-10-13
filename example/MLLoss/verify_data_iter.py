@@ -158,3 +158,45 @@ class VerifyDataIter():
 	return {'data': self.data_buf[:self.read_img_pos + self.read_img_neg],'label':self.label_buf[:self.read_img_pos + self.read_img_neg],
 		'pos_set': self.pos_set}
 		
+class LevelDBDataIter():
+    def __init__(self, leveldb_dir, with_additional_label=False):
+	try:
+	    self.leveldb = leveldb.LevelDB(leveldb_dir)
+	    self.dataiter = self.leveldb.RangeIter(include_value = True)
+	except Exception as e:
+	    logging.error("Fail to open leveldb %s "%(leveldb_dir))
+	    logging.error("Error message: %s", e.message)
+	    quit()
+	self.num_samples = -1
+	self.with_additional_label = with_additional_label
+	
+    def next(self):
+	try:
+	    key, value = self.dataiter.next()
+	except Exception as e:
+	    raise StopIteration
+	if self.with_additional_label:
+	    id, img_str,h,w,c, addtional_label_str, addtional_label_length, image_filename = struct.unpack(fmt, value)
+	else:
+	    id, img_str,h,w,c,  image_filename = struct.unpack(fmt, value)
+	data = np.zeros((h,w,c), dtype='uint8')
+	data.data[:] = img_str
+	return id, data
+    
+    def reset(self):
+	self.dataiter = self.leveldb.RangeIter(include_value = True)
+	
+	
+    def num_samples(self):
+	if self.num_samples != -1:
+	    return self.num_samples
+	else:
+	    num_samples = 0
+	    dataiter = self.leveldb.RangeIter(include_value = False)
+	    while 1:
+		try:
+		    key = dataiter.next()
+		    num_samples += 1
+		except Exception as e:
+		    break
+	    self.num_samples = num_samples
