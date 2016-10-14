@@ -110,6 +110,18 @@ class VerifyLoss:
     def _select_genuine_pair(self, label, genuine_label):        
         genuine_pair = []
 	genuine_pair_dist = 0
+        sample = Counter(np.random.randint(0, len(pos_label)))
+        for i in sample:
+            l = pos_label[i]
+            c = sample[i]
+            inds, = np.nonzero(label == l)
+            idx_a = inds[np.random.randint(0, inds.shape[0], c)]
+            idx_b = inds[np.random.randint(0, inds.shape[0], c)]
+            index = (idx_a != indx_b)
+            pos_pair = pos_pair + zip(idx_a[index], idx_b[index])
+            dist = data[idx_a[index]] - data[idx_b[index]]
+            pos_pair_dist +=  (dist*dist).sum()
+        """
         for l in genuine_label:
             inds, = np.nonzero(label == l)
             k_inds = self.k_inds[l]
@@ -118,7 +130,7 @@ class VerifyLoss:
                 a[:] = inds[i]
                 genuine_pair = genuine_pair + zip(a, k_inds[i,...]) 
 		genuine_pair_dist +=  self.k_dists[l][i,...].sum()
-                    
+        """           
         return  np.array(genuine_pair), genuine_pair_dist
                     
     def _select_imposter_triplet(self, data, label, genuine_label):
