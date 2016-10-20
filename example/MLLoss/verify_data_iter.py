@@ -175,6 +175,8 @@ class LevelDBDataIter():
 	    key, value = self.dataiter.next()
 	except Exception as e:
 	    raise StopIteration
+	index, idx, fmt = key.split('_')
+        idx = int(idx)
 	if self.with_additional_label:
 	    id, img_str,h,w,c, addtional_label_str, addtional_label_length, image_filename = struct.unpack(fmt, value)
 	else:
